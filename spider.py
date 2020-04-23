@@ -1,19 +1,14 @@
-import json
 import multiprocessing
 import os
-import re
 import time
-from copy import copy
 
 import requests
-import xlrd
-import xlwt
-from xlutils.copy import copy
 from loguru import logger
 from requests import RequestException
-from config import *
 import execjs
 import pandas as pd
+
+# pyinstaller --noconfirm spider.py
 
 @logger.catch()
 def get_html(url):
@@ -45,10 +40,30 @@ def main():
     logger.add(os.getcwd() + '\\log\\{time}.log', encoding="utf-8", rotation="00:00", retention='1 days')
     logger.debug('--------------开始执行main------------------')
 
-    # websdr_list = 'http://websdr.ewi.utwente.nl/~~websdrlistk?v=1&chseq=0'
-    # data_js = get_html(websdr_list)
+    websdr_list = 'http://websdr.ewi.utwente.nl/~~websdrlistk?v=1&chseq=0'
+    data_js = get_html(websdr_list)
+    # 通过compile命令转成一个js对象
+    docjs = execjs.compile(data_js)
+    # 调用变量
+    res = docjs.eval('sdrs')
+    print(res)
+
+    # if os.path.exists('data.js'):
+    #     f = open('data.js', 'r')
+    #     raw_data = f.read()
+    #     docjs = execjs.compile(raw_data)
+    #     # # 调用变量
+    #     res = docjs.eval('sdrs')
+    #     f.close()
+
+    # # 读取js文件
+    # with open('data.js', encoding='utf-8') as f:
+    #     js = f.read()
     # # 通过compile命令转成一个js对象
-    # docjs = execjs.compile(data_js)
+    # docjs = execjs.compile(js)
+    # # 调用function
+    # # res = docjs.call('createGuid')
+    # # print(res)
     # # 调用变量
     # res = docjs.eval('sdrs')
     # print(res)
@@ -68,29 +83,10 @@ def main():
         path_name = file_path + '/' + file_name
         logger.debug(path_name)
 
-    # # 读取js文件
-    # with open('data.js', encoding='utf-8') as f:
-    #     js = f.read()
-    # # 通过compile命令转成一个js对象
-    # docjs = execjs.compile(js)
-    # # 调用function
-    # # res = docjs.call('createGuid')
-    # # print(res)
-    # # 调用变量
-    # res = docjs.eval('sdrs')
-    # print(res)
-
-    if os.path.exists('data.js'):
-        f = open('data.js', 'r')
-        raw_data = f.read()
-        docjs = execjs.compile(raw_data)
-        # # 调用变量
-        res = docjs.eval('sdrs')
-        f.close()
-
 
 
     df = pd.DataFrame()
+
     for item in res:
         data = {
             'desc': '',
@@ -119,11 +115,12 @@ def main():
                     Antenna = sub_item['a'] if 'a' in sub_item else '------'
 
                     # Antenna.append(sub_item['a'])
-                    data['Frequency_range'] = Frequency_low+' --- '+Frequency_high
+                    data['Frequency_range'] = Frequency_low+' --- '+Frequency_high + '  MHz'
                     data['Antenna'] = Antenna
                     # data = [i, desc, Frequency_low+' --- '+Frequency_high, Antenna, lon, lat, url, users, qth]
                     print(data)
                     df1 = pd.DataFrame(data,index=[0])
+
                     df = df.append(df1, sort=False)
             else:
                 data['Frequency_range'] = '-----'
@@ -131,9 +128,10 @@ def main():
                 # data = [i, desc, '------', '------', lon, lat, url, users, qth]
                 # print(data)
                 df1 = pd.DataFrame(data,index=[0])
+
                 df = df.append(df1, sort=False)
     df.to_excel(path_name, index=False)
-    print('df')
+    # print('df')
 
     os.system("explorer.exe %s"% file_path)
 
@@ -162,6 +160,8 @@ def trans_d2dmd(d_latitude, d_longitude):
     if d_latitude < float(0) and d_longitude < float(0):  # 南纬西经
         return str(abs(d)).zfill(2) + str(abs(m)).zfill(2) + str(abs(s)).zfill(2) + 'S', \
                str(abs(d_1)).zfill(3) + str(abs(m_1)).zfill(2) + str(abs(s_1)).zfill(2) + 'W'
+    if d_latitude == float(0) or d_longitude == float(0):
+        return str(d_latitude), str(d_longitude)
 
 def pandas_excel(path,value):
     data = pd.read_csv('./888.text',sep='\t')
